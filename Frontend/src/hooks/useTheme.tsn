@@ -1,0 +1,4 @@
+import { useTheme, type Theme } from "./useTheme";
+
+export { useTheme };
+export type { Theme };
