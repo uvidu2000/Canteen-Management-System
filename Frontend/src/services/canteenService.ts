@@ -115,5 +115,10 @@ export const canteenService = {
       foodItemId
     });
     return response.data;
+  },
+
+  async endVote(voteId: string): Promise<FoodVote> {
+    const response = await http.post<FoodVote>(API_ENDPOINTS.votes.end(voteId));
+    return response.data;
   }
 };

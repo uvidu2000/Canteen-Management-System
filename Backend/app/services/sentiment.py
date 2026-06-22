@@ -1,5 +1,11 @@
+import json
 import re
+import zipfile
 from collections import Counter
+from functools import lru_cache
+from pathlib import Path
+
+from flask import current_app
 
 
 class FoodReviewSentimentAnalyzer:
@@ -309,6 +315,132 @@ class FoodReviewSentimentAnalyzer:
         return score
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+TRAINING_MODELS_DIR = PROJECT_ROOT / "Models" / "Training"
+SENTIMENT_MODEL_ZIP = TRAINING_MODELS_DIR / "sentiment_model.zip"
+RATING_MODEL_ZIP = TRAINING_MODELS_DIR / "rating_model.zip"
+MAX_MODEL_LENGTH = 256
+
+
+def get_model_cache_dir() -> Path:
+    cache_dir = Path(current_app.instance_path) / "ml_models"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def extract_model_if_needed(zip_path: Path, target_name: str) -> Path:
+    if not zip_path.exists():
+        raise FileNotFoundError(f"Model zip file was not found: {zip_path}")
+
+    target_dir = get_model_cache_dir() / target_name
+    config_path = target_dir / "config.json"
+    model_path = target_dir / "model.safetensors"
+
+    if config_path.exists() and model_path.exists():
+        return target_dir
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(zip_path) as model_zip:
+        model_zip.extractall(target_dir)
+
+    return target_dir
+
+
+def load_label_map(model_dir: Path) -> dict[int, str]:
+    with (model_dir / "label_map.json").open("r", encoding="utf-8") as label_map_file:
+        raw_label_map = json.load(label_map_file)
+
+    return {int(label): value for label, value in raw_label_map.items()}
+
+
+@lru_cache(maxsize=1)
+def load_transformer_models():
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    import torch
+
+    sentiment_model_dir = extract_model_if_needed(SENTIMENT_MODEL_ZIP, "sentiment_model")
+    rating_model_dir = extract_model_if_needed(RATING_MODEL_ZIP, "rating_model")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    tokenizer = AutoTokenizer.from_pretrained(sentiment_model_dir, local_files_only=True)
+    sentiment_model = AutoModelForSequenceClassification.from_pretrained(
+        sentiment_model_dir,
+        local_files_only=True,
+    ).to(device)
+    rating_model = AutoModelForSequenceClassification.from_pretrained(
+        rating_model_dir,
+        local_files_only=True,
+    ).to(device)
+    sentiment_model.eval()
+    rating_model.eval()
+
+    return {
+        "torch": torch,
+        "device": device,
+        "tokenizer": tokenizer,
+        "sentiment_model": sentiment_model,
+        "rating_model": rating_model,
+        "sentiment_labels": load_label_map(sentiment_model_dir),
+        "rating_labels": load_label_map(rating_model_dir),
+    }
+
+
+def predict_label(text: str, model, tokenizer, label_map: dict[int, str], torch, device):
+    inputs = tokenizer(
+        text,
+        truncation=True,
+        padding=True,
+        max_length=MAX_MODEL_LENGTH,
+        return_tensors="pt",
+    )
+    inputs = {key: value.to(device) for key, value in inputs.items()}
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        probabilities = torch.softmax(outputs.logits, dim=-1)[0]
+        label_index = int(torch.argmax(probabilities).item())
+        confidence = float(probabilities[label_index].item())
+
+    return label_map[label_index], round(confidence, 4)
+
+
+def parse_rating_label(label: str) -> int:
+    match = re.search(r"\d+", label)
+
+    if match is None:
+        return 0
+
+    return int(match.group(0))
+
+
+def predict_review_with_models(comment: str) -> dict:
+    models = load_transformer_models()
+    sentiment, sentiment_confidence = predict_label(
+        comment,
+        models["sentiment_model"],
+        models["tokenizer"],
+        models["sentiment_labels"],
+        models["torch"],
+        models["device"],
+    )
+    rating_label, rating_confidence = predict_label(
+        comment,
+        models["rating_model"],
+        models["tokenizer"],
+        models["rating_labels"],
+        models["torch"],
+        models["device"],
+    )
+
+    return {
+        "sentiment": sentiment,
+        "sentiment_score": sentiment_confidence,
+        "predicted_rating": parse_rating_label(rating_label),
+        "rating_confidence": rating_confidence,
+    }
+
+
 def analyze_food_item_reviews(reviews):
     """
     This function analyzes all reviews of one food item.
@@ -320,28 +452,32 @@ def analyze_food_item_reviews(reviews):
         {"rating": 2, "comment": "The portion was small and too expensive"}
     ]
     """
-    analyzer = FoodReviewSentimentAnalyzer()
+    aspect_analyzer = FoodReviewSentimentAnalyzer()
 
     analyzed_reviews = []
     sentiment_counter = Counter()
-    total_rating = 0
+    total_predicted_rating = 0
 
     for review in reviews:
-        comment = review["comment"]
-        rating = review["rating"]
+        comment = review.get("comment", "")
+        model_result = predict_review_with_models(comment)
+        aspect_result = aspect_analyzer.analyze_review(comment)
+        predicted_rating = model_result["predicted_rating"]
 
-        result = analyzer.analyze_review(comment)
+        if predicted_rating <= 0:
+            predicted_rating = int(review.get("rating", 0))
 
         analyzed_reviews.append({
-            "rating": rating,
+            "rating": predicted_rating,
             "comment": comment,
-            "sentiment": result["sentiment"],
-            "sentiment_score": result["sentiment_score"],
-            "aspect_sentiment": result["aspect_sentiment"]
+            "sentiment": model_result["sentiment"],
+            "sentiment_score": model_result["sentiment_score"],
+            "rating_confidence": model_result["rating_confidence"],
+            "aspect_sentiment": aspect_result["aspect_sentiment"]
         })
 
-        sentiment_counter[result["sentiment"]] += 1
-        total_rating += rating
+        sentiment_counter[model_result["sentiment"]] += 1
+        total_predicted_rating += predicted_rating
 
     review_count = len(reviews)
 
@@ -353,7 +489,7 @@ def analyze_food_item_reviews(reviews):
             "reviews": []
         }
 
-    average_rating = total_rating / review_count
+    average_rating = total_predicted_rating / review_count
 
     overall_sentiment = sentiment_counter.most_common(1)[0][0]
 

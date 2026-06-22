@@ -73,6 +73,7 @@ export type FoodReviewSentiment = {
   comment: string;
   sentiment: SentimentLabel;
   sentiment_score: number;
+  rating_confidence?: number;
   aspect_sentiment: Record<string, AspectSentiment>;
 };
 
@@ -107,6 +108,9 @@ export type FoodVote = {
   title: string;
   creatorName: string;
   createdAt: string;
+  status: "Active" | "Ended";
+  endedAt: string | null;
+  canEnd: boolean;
   currentUserVoteFoodItemId: string | null;
   participants: RegisteredStudent[];
   options: VoteOption[];

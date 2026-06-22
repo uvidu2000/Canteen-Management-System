@@ -27,6 +27,9 @@ Backend/instance/
 *.sqlite3
 *.db
 
+# Large trained model artifacts
+Models/Training/*.zip
+
 # Environment and local config
 .env
 .env.*

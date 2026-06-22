@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Plus, Trash2, Users, Vote } from "lucide-react";
+import { ArrowLeft, Check, Plus, StopCircle, Trash2, Users, Vote } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -60,6 +60,12 @@ export function StudentVotesPage() {
   const submitVoteMutation = useMutation({
     mutationFn: ({ voteId, foodItemId }: { voteId: string; foodItemId: string }) =>
       canteenService.submitVote(voteId, foodItemId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.votes });
+    }
+  });
+  const endVoteMutation = useMutation({
+    mutationFn: canteenService.endVote,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.votes });
     }
@@ -291,7 +297,9 @@ export function StudentVotesPage() {
                 <VoteCard
                   key={foodVote.id}
                   vote={foodVote}
+                  isEnding={endVoteMutation.isPending}
                   isSubmitting={submitVoteMutation.isPending}
+                  onEnd={() => endVoteMutation.mutate(foodVote.id)}
                   onSubmit={(foodItemId) =>
                     submitVoteMutation.mutate({ voteId: foodVote.id, foodItemId })
                   }
@@ -360,12 +368,15 @@ function SelectionPanel({ title, emptyText, items, onRemove }: SelectionPanelPro
 
 type VoteCardProps = {
   vote: FoodVote;
+  isEnding: boolean;
   isSubmitting: boolean;
+  onEnd: () => void;
   onSubmit: (foodItemId: string) => void;
 };
 
-function VoteCard({ vote, isSubmitting, onSubmit }: VoteCardProps) {
+function VoteCard({ vote, isEnding, isSubmitting, onEnd, onSubmit }: VoteCardProps) {
   const totalVotes = vote.options.reduce((total, option) => total + option.voteCount, 0);
+  const isEnded = vote.status === "Ended";
 
   return (
     <article className="rounded-lg border bg-background p-4">
@@ -378,17 +389,41 @@ function VoteCard({ vote, isSubmitting, onSubmit }: VoteCardProps) {
           <p className="mt-1 text-sm text-muted-foreground">
             {vote.participants.length} participants
           </p>
+          {vote.endedAt ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ended at {formatDateTime(vote.endedAt)}
+            </p>
+          ) : null}
         </div>
-        {vote.currentUserVoteFoodItemId ? (
-          <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-            <Check className="mr-1.5 h-3.5 w-3.5" />
-            Voted
-          </span>
-        ) : (
-          <span className="inline-flex w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-            Pending vote
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {isEnded ? (
+            <span className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+              Ended
+            </span>
+          ) : vote.currentUserVoteFoodItemId ? (
+            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <Check className="mr-1.5 h-3.5 w-3.5" />
+              Voted
+            </span>
+          ) : (
+            <span className="inline-flex w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+              Pending vote
+            </span>
+          )}
+          {vote.canEnd ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onEnd}
+              disabled={isEnding}
+              className="text-destructive hover:text-destructive"
+            >
+              <StopCircle className="mr-2 h-4 w-4" />
+              {isEnding ? "Ending" : "End Vote"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 space-y-3">
@@ -429,11 +464,11 @@ function VoteCard({ vote, isSubmitting, onSubmit }: VoteCardProps) {
                   type="button"
                   variant={isSelected ? "outline" : "default"}
                   size="sm"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isEnded}
                   onClick={() => onSubmit(option.foodItemId)}
                   className="shrink-0"
                 >
-                  {isSelected ? "Selected" : "Vote"}
+                  {isEnded && isSelected ? "Final choice" : isEnded ? "Ended" : isSelected ? "Selected" : "Vote"}
                 </Button>
               </div>
             </div>

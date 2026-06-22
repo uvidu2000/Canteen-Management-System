@@ -15,7 +15,9 @@ def ensure_vote_schema() -> None:
           title TEXT NOT NULL,
           creator_identifier TEXT NOT NULL,
           creator_name TEXT NOT NULL,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'Active',
+          ended_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS vote_participants (
@@ -49,6 +51,16 @@ def ensure_vote_schema() -> None:
         );
         """
     )
+    vote_columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(vote_sessions)").fetchall()
+    }
+
+    if "status" not in vote_columns:
+        db.execute("ALTER TABLE vote_sessions ADD COLUMN status TEXT NOT NULL DEFAULT 'Active'")
+
+    if "ended_at" not in vote_columns:
+        db.execute("ALTER TABLE vote_sessions ADD COLUMN ended_at TEXT")
+
     db.commit()
 
 
@@ -128,6 +140,9 @@ def serialize_vote(row, current_user) -> dict:
         "title": row["title"],
         "creatorName": row["creator_name"],
         "createdAt": format_datetime(row["created_at"]),
+        "status": row["status"],
+        "endedAt": format_datetime(row["ended_at"]) if row["ended_at"] else None,
+        "canEnd": row["creator_identifier"] == current_user["identifier"] and row["status"] == "Active",
         "currentUserVoteFoodItemId": str(ballot["food_item_id"]) if ballot else None,
         "participants": [
             {
@@ -222,10 +237,10 @@ def create_vote(current_user):
     created_at = current_timestamp()
     cursor = db.execute(
         """
-        INSERT INTO vote_sessions (title, creator_identifier, creator_name, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO vote_sessions (title, creator_identifier, creator_name, created_at, status)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (title, current_user["identifier"], current_user["name"], created_at),
+        (title, current_user["identifier"], current_user["name"], created_at, "Active"),
     )
     vote_id = cursor.lastrowid
 
@@ -264,6 +279,14 @@ def submit_vote(vote_id: int, current_user):
         return {"message": "Invalid food item selection."}, 400
 
     db = get_db()
+    vote = db.execute("SELECT status FROM vote_sessions WHERE id = ?", (vote_id,)).fetchone()
+
+    if vote is None:
+        return {"message": "Vote not found."}, 404
+
+    if vote["status"] == "Ended":
+        return {"message": "This vote has ended."}, 400
+
     participant = db.execute(
         """
         SELECT id
@@ -296,6 +319,40 @@ def submit_vote(vote_id: int, current_user):
         DO UPDATE SET food_item_id = excluded.food_item_id, voted_at = excluded.voted_at
         """,
         (vote_id, current_user["identifier"], food_item_id, current_timestamp()),
+    )
+    db.commit()
+
+    row = db.execute("SELECT * FROM vote_sessions WHERE id = ?", (vote_id,)).fetchone()
+    return serialize_vote(row, current_user)
+
+
+@votes_bp.post("/<int:vote_id>/end")
+@require_portal("student")
+def end_vote(vote_id: int, current_user):
+    ensure_vote_schema()
+    db = get_db()
+    vote = db.execute(
+        """
+        SELECT id, creator_identifier, status
+        FROM vote_sessions
+        WHERE id = ?
+        """,
+        (vote_id,),
+    ).fetchone()
+
+    if vote is None:
+        return {"message": "Vote not found."}, 404
+
+    if vote["creator_identifier"] != current_user["identifier"]:
+        return {"message": "Only the vote creator can end this vote."}, 403
+
+    if vote["status"] == "Ended":
+        row = db.execute("SELECT * FROM vote_sessions WHERE id = ?", (vote_id,)).fetchone()
+        return serialize_vote(row, current_user)
+
+    db.execute(
+        "UPDATE vote_sessions SET status = ?, ended_at = ? WHERE id = ?",
+        ("Ended", current_timestamp(), vote_id),
     )
     db.commit()
 
