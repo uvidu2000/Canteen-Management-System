@@ -64,7 +64,9 @@ CREATE TABLE vote_sessions (
   title TEXT NOT NULL,
   creator_identifier TEXT NOT NULL,
   creator_name TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Ended')),
+  ended_at TEXT
 );
 
 CREATE TABLE vote_participants (

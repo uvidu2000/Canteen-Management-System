@@ -107,6 +107,9 @@ export type FoodVote = {
   title: string;
   creatorName: string;
   createdAt: string;
+  status: "Active" | "Ended";
+  endedAt: string | null;
+  canEnd: boolean;
   currentUserVoteFoodItemId: string | null;
   participants: RegisteredStudent[];
   options: VoteOption[];

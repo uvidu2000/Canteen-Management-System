@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
   votes: {
     base: "/votes",
     students: "/votes/students",
-    ballot: (voteId: string) => `/votes/${voteId}/ballot`
+    ballot: (voteId: string) => `/votes/${voteId}/ballot`,
+    end: (voteId: string) => `/votes/${voteId}/end`
   }
 } as const;
