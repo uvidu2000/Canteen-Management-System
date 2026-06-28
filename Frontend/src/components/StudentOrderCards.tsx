@@ -1,13 +1,20 @@
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { StudentOrder } from "@/types/canteen";
 import { formatDateTime, formatPrice, getOrderStatusClassName } from "@/utils/canteen";
 import { cn } from "@/utils/cn";
 
 type StudentOrderCardsProps = {
   orders: StudentOrder[];
+  cancellingOrderId?: string;
+  onCancel: (order: StudentOrder) => void;
 };
 
-export function StudentOrderCards({ orders }: StudentOrderCardsProps) {
+export function StudentOrderCards({
+  orders,
+  cancellingOrderId,
+  onCancel
+}: StudentOrderCardsProps) {
   if (!orders.length) {
     return (
       <div className="rounded-lg border border-dashed py-10 text-center">
@@ -64,6 +71,18 @@ export function StudentOrderCards({ orders }: StudentOrderCardsProps) {
               </div>
             ))}
           </div>
+          {order.status === "Pending" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 w-full text-destructive hover:text-destructive"
+              disabled={cancellingOrderId === order.id}
+              onClick={() => onCancel(order)}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              {cancellingOrderId === order.id ? "Cancelling" : "Cancel Order"}
+            </Button>
+          ) : null}
         </article>
       ))}
     </div>

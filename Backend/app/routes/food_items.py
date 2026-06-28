@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 
-from app.auth import require_auth, require_portal
+from app.auth import require_auth, require_portal, require_role
 from app.database import current_timestamp, format_datetime, get_db, row_to_dict
 from app.services.sentiment import analyze_food_item_reviews
 
@@ -55,7 +55,7 @@ def list_food_items(current_user):
 
 
 @food_items_bp.post("")
-@require_portal("staff")
+@require_role("canteen_staff")
 def create_food_item(current_user):
     payload = request.get_json(silent=True) or {}
     now = current_timestamp()
@@ -81,7 +81,7 @@ def create_food_item(current_user):
 
 
 @food_items_bp.patch("/<int:food_item_id>")
-@require_portal("staff")
+@require_role("canteen_staff")
 def update_food_item(food_item_id: int, current_user):
     payload = request.get_json(silent=True) or {}
     existing = get_db().execute("SELECT * FROM food_items WHERE id = ?", (food_item_id,)).fetchone()
@@ -124,7 +124,7 @@ def update_food_item(food_item_id: int, current_user):
 
 
 @food_items_bp.delete("/<int:food_item_id>")
-@require_portal("staff")
+@require_role("canteen_staff")
 def delete_food_item(food_item_id: int, current_user):
     db = get_db()
     db.execute("DELETE FROM food_items WHERE id = ?", (food_item_id,))
@@ -133,7 +133,7 @@ def delete_food_item(food_item_id: int, current_user):
 
 
 @food_items_bp.get("/<int:food_item_id>/sentiment")
-@require_portal("staff")
+@require_role("canteen_staff")
 def analyze_food_item_sentiment(food_item_id: int, current_user):
     db = get_db()
     food_item = db.execute("SELECT id FROM food_items WHERE id = ?", (food_item_id,)).fetchone()

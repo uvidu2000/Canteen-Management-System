@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, request
 
-from app.auth import require_auth, require_portal
+from app.auth import require_auth, require_portal, require_role
 from app.database import current_timestamp, format_datetime, get_db
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/orders")
@@ -132,6 +132,34 @@ def serialize_order(row) -> dict:
     }
 
 
+def cancel_order_and_restore_stock(order_id: int) -> None:
+    db = get_db()
+    updated_at = current_timestamp()
+    items = db.execute(
+        """
+        SELECT food_item_id, quantity
+        FROM order_items
+        WHERE order_id = ?
+        """,
+        (order_id,),
+    ).fetchall()
+
+    for item in items:
+        db.execute(
+            """
+            UPDATE food_items
+            SET stock = stock + ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (item["quantity"], updated_at, item["food_item_id"]),
+        )
+
+    db.execute(
+        "UPDATE orders SET status = 'Cancelled' WHERE id = ?",
+        (order_id,),
+    )
+
+
 @orders_bp.get("")
 @require_auth
 def list_orders(current_user):
@@ -139,6 +167,9 @@ def list_orders(current_user):
     db = get_db()
 
     if current_user["portal"] == "staff":
+        if current_user["role"] != "canteen_staff":
+            return {"message": "Forbidden"}, 403
+
         rows = db.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
     else:
         rows = db.execute(
@@ -275,8 +306,34 @@ def create_order(current_user):
     return serialize_order(row), 201
 
 
+@orders_bp.post("/<int:order_id>/cancel")
+@require_portal("student")
+def cancel_student_order(order_id: int, current_user):
+    ensure_order_items_schema()
+    db = get_db()
+    order = db.execute(
+        """
+        SELECT *
+        FROM orders
+        WHERE id = ? AND student_mobile = ?
+        """,
+        (order_id, current_user["identifier"]),
+    ).fetchone()
+
+    if order is None:
+        return {"message": "Order not found."}, 404
+
+    if normalize_order_status(order["status"]) != "Pending":
+        return {"message": "Only pending orders can be cancelled."}, 409
+
+    cancel_order_and_restore_stock(order_id)
+    db.commit()
+    row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    return serialize_order(row)
+
+
 @orders_bp.patch("/<int:order_id>")
-@require_portal("staff")
+@require_role("canteen_staff")
 def update_order_status(order_id: int, current_user):
     ensure_order_items_schema()
     payload = request.get_json(silent=True) or {}
@@ -286,19 +343,31 @@ def update_order_status(order_id: int, current_user):
         return {"message": "Invalid order status."}, 400
 
     db = get_db()
-    existing = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
+    existing = db.execute(
+        "SELECT id, status FROM orders WHERE id = ?",
+        (order_id,),
+    ).fetchone()
 
     if existing is None:
         return {"message": "Order not found."}, 404
 
-    db.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+    current_status = normalize_order_status(existing["status"])
+
+    if current_status in {"Collected", "Cancelled"} and status != current_status:
+        return {"message": "Completed or cancelled orders cannot be changed."}, 409
+
+    if status == "Cancelled" and current_status != "Cancelled":
+        cancel_order_and_restore_stock(order_id)
+    else:
+        db.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+
     db.commit()
     row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     return serialize_order(row)
 
 
 @orders_bp.delete("/<int:order_id>")
-@require_portal("staff")
+@require_role("canteen_staff")
 def delete_order(order_id: int, current_user):
     ensure_order_items_schema()
     db = get_db()

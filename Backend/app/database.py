@@ -46,7 +46,7 @@ def format_datetime(value: str) -> str:
         return value[:16].replace("T", " ")
 
 
-def ensure_users_seeded() -> None:
+def ensure_user_schema() -> None:
     db = get_db()
     db.execute(
         """
@@ -54,20 +54,65 @@ def ensure_users_seeded() -> None:
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           portal TEXT NOT NULL CHECK (portal IN ('student', 'staff')),
           identifier TEXT NOT NULL UNIQUE,
-          display_name TEXT NOT NULL
+          display_name TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'student',
+          status TEXT NOT NULL DEFAULT 'Active',
+          created_at TEXT NOT NULL DEFAULT ''
         )
         """
     )
+
+    columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(users)").fetchall()
+    }
+
+    if "role" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN role TEXT")
+    if "status" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN status TEXT")
+    if "created_at" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN created_at TEXT")
+
+    now = current_timestamp()
+    db.execute(
+        """
+        UPDATE users
+        SET role = CASE
+          WHEN portal = 'staff' THEN 'canteen_staff'
+          ELSE 'student'
+        END
+        WHERE role IS NULL OR role = ''
+        """
+    )
+    db.execute(
+        "UPDATE users SET status = 'Active' WHERE status IS NULL OR status = ''"
+    )
+    db.execute(
+        "UPDATE users SET created_at = ? WHERE created_at IS NULL OR created_at = ''",
+        (now,),
+    )
+    db.commit()
+
+
+def ensure_users_seeded() -> None:
+    ensure_user_schema()
+    db = get_db()
+    now = current_timestamp()
     db.executemany(
         """
-        INSERT OR IGNORE INTO users (portal, identifier, display_name)
-        VALUES (?, ?, ?)
+        INSERT OR IGNORE INTO users (
+          portal, identifier, display_name, role, status, created_at
+        )
+        VALUES (?, ?, ?, ?, 'Active', ?)
         """,
         [
-            ("staff", "94714547325", "Staff User"),
-            ("student", "20211188", "Uvidu"),
-            ("student", "20209891", "Nipuni"),
-            ("student", "20240982", "Ruhiri"),
+            ("staff", "94714547325", "Staff User", "canteen_staff", now),
+            ("student", "20211188", "Uvidu", "student", now),
+            ("student", "20209891", "Nipuni", "student", now),
+            ("student", "20240982", "Ruhiri", "student", now),
+            ("staff", "94712345678", "System Admin 1", "admin", now),
+            ("staff", "94765467928", "System Admin 2", "admin", now),
         ],
     )
     db.commit()

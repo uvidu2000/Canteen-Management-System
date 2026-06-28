@@ -91,6 +91,11 @@ export const canteenService = {
     return response.data;
   },
 
+  async cancelOrder(orderId: string): Promise<StudentOrder> {
+    const response = await http.post<StudentOrder>(API_ENDPOINTS.orders.cancel(orderId));
+    return response.data;
+  },
+
   async deleteOrder(orderId: string): Promise<void> {
     await http.delete(API_ENDPOINTS.orders.byId(orderId));
   },

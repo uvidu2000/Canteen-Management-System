@@ -3,6 +3,10 @@ export const API_ENDPOINTS = {
     login: "/auth/login",
     verifyOtp: "/auth/verify-otp"
   },
+  users: {
+    base: "/users",
+    byId: (userId: string) => `/users/${userId}`
+  },
   foodItems: {
     base: "/food-items",
     byId: (foodItemId: string) => `/food-items/${foodItemId}`,
@@ -13,7 +17,8 @@ export const API_ENDPOINTS = {
   },
   orders: {
     base: "/orders",
-    byId: (orderId: string) => `/orders/${orderId}`
+    byId: (orderId: string) => `/orders/${orderId}`,
+    cancel: (orderId: string) => `/orders/${orderId}/cancel`
   },
   votes: {
     base: "/votes",
