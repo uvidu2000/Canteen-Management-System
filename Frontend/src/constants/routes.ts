@@ -3,6 +3,7 @@ export const ROUTES = {
   login: "/login",
   otp: "/otp",
   home: "/home",
+  adminUsers: "/admin/users",
   staffOrders: "/staff/orders",
   studentOrders: "/student/orders",
   studentVotes: "/student/votes",

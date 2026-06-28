@@ -10,7 +10,7 @@ def get_user(portal: str, identifier: str):
     ensure_users_seeded()
     return get_db().execute(
         """
-        SELECT portal, identifier, display_name
+        SELECT portal, identifier, display_name, role, status
         FROM users
         WHERE portal = ? AND identifier = ?
         """,
@@ -27,8 +27,13 @@ def request_otp():
     if portal not in ("student", "staff"):
         return {"message": "Invalid portal."}, 400
 
-    if get_user(portal, identifier) is None:
+    user = get_user(portal, identifier)
+
+    if user is None:
         return {"message": "Identifier is not registered for this portal."}, 401
+
+    if user["status"] != "Active":
+        return {"message": "This user account is inactive."}, 403
 
     return {"message": "OTP sent."}
 
@@ -48,7 +53,16 @@ def verify_otp():
     if user is None or otp != DEMO_OTP:
         return {"message": "Invalid OTP."}, 401
 
+    if user["status"] != "Active":
+        return {"message": "This user account is inactive."}, 403
+
     return {
-        "accessToken": create_access_token(portal, identifier, user["display_name"]),
+        "accessToken": create_access_token(
+            portal,
+            identifier,
+            user["display_name"],
+            user["role"],
+        ),
         "portal": portal,
+        "role": user["role"],
     }

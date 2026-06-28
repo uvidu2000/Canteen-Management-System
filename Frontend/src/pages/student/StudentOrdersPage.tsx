@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { ArrowLeft, LogOut, PackageCheck } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { StudentOrderCards } from "@/components/StudentOrderCards";
@@ -7,15 +8,24 @@ import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/hooks/useAuth";
 import { queryKeys } from "@/lib/queryKeys";
 import { canteenService } from "@/services/canteenService";
+import type { StudentOrder } from "@/types/canteen";
 
 export function StudentOrdersPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { logout, portal, user } = useAuth();
   const ordersQuery = useQuery({
     queryKey: queryKeys.orders,
     queryFn: canteenService.listOrders
   });
   const orders = ordersQuery.data ?? [];
+  const cancelOrderMutation = useMutation({
+    mutationFn: canteenService.cancelOrder,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.foodItems });
+    }
+  });
 
   if (portal === "staff") {
     return <Navigate to={ROUTES.home} replace />;
@@ -25,6 +35,22 @@ export function StudentOrdersPage() {
     logout();
     navigate(ROUTES.login, { replace: true });
   }
+
+  function handleCancelOrder(order: StudentOrder) {
+    const shouldCancel = window.confirm(
+      `Cancel ${order.orderNumber}? The food items will be returned to available stock.`
+    );
+
+    if (shouldCancel) {
+      cancelOrderMutation.mutate(order.id);
+    }
+  }
+
+  const cancellationError =
+    cancelOrderMutation.error instanceof AxiosError
+      ? (cancelOrderMutation.error.response?.data as { message?: string } | undefined)?.message ??
+        "Unable to cancel the order."
+      : "Unable to cancel the order.";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -80,7 +106,20 @@ export function StudentOrdersPage() {
               </p>
             </div>
           ) : (
-            <StudentOrderCards orders={orders} />
+            <>
+              {cancelOrderMutation.isError ? (
+                <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {cancellationError}
+                </div>
+              ) : null}
+              <StudentOrderCards
+                orders={orders}
+                cancellingOrderId={
+                  cancelOrderMutation.isPending ? cancelOrderMutation.variables : undefined
+                }
+                onCancel={handleCancelOrder}
+              />
+            </>
           )}
         </section>
       </main>

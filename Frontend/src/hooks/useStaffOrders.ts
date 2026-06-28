@@ -8,7 +8,8 @@ export function useStaffOrders() {
 
   const ordersQuery = useQuery({
     queryKey: queryKeys.orders,
-    queryFn: canteenService.listOrders
+    queryFn: canteenService.listOrders,
+    refetchInterval: 5000
   });
 
   const updateStatusMutation = useMutation({

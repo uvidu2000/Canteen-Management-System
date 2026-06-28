@@ -12,7 +12,10 @@ CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   portal TEXT NOT NULL CHECK (portal IN ('student', 'staff')),
   identifier TEXT NOT NULL UNIQUE,
-  display_name TEXT NOT NULL
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('student', 'lecturer', 'canteen_staff', 'admin')),
+  status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE food_items (
