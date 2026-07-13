@@ -29,7 +29,6 @@ class FoodReviewSentimentAnalyzer:
             "worth": 2
         }
 
-        
         self.negative_words = {
             "bad": -2,
             "terrible": -3,
@@ -405,4 +404,4 @@ if __name__ == "__main__":
 
     # food_item_result = analyze_food_item_reviews(sample_reviews)
 
-    # print(food_item_result)
+    #print (food_item_result)
