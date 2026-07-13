@@ -11,7 +11,7 @@ from app.routes.orders import orders_bp
 from app.routes.votes import votes_bp
 from app.routes.users import users_bp
 
-
+#create app
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     database_path = Path(app.instance_path) / "canteen.sqlite3"
