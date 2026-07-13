@@ -55,7 +55,7 @@ class FoodReviewSentimentAnalyzer:
             "unhygienic": -3
         }
 
-        # Phrases give stronger meaning than single words
+        # Phrasess give stronger meaning than single words
         self.positive_phrases = {
             "very tasty": 3,
             "really tasty": 3,
