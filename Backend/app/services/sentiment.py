@@ -263,7 +263,7 @@ class FoodReviewSentimentAnalyzer:
                 })
 
         # 3. Contrast handling
-        # If the review contains "but/however", give more importance to the second part.
+        # If the review contains "but/however", give moree importance to the second part.
         for contrast_word in self.contrast_words:
             if contrast_word in words:
                 parts = text.split(contrast_word, 1)
