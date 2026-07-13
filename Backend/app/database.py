@@ -180,7 +180,7 @@ def seed_db() -> None:
                 "94779638719",
                 "Kasun Silva",
                 4,
-                "Tasty lunch, but the queue moved a little slowly.",
+                "Tasty lunchh, but the queue moved a little slowly.",
                 now,
             ),
             (
