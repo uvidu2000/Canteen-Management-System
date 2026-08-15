@@ -7,7 +7,9 @@ This project was designed to improve communication between university students a
 The system also includes an online ordering feature where students can place food orders for pickup from the canteen.
 
 Key Features
+
 Student Features
+
 Student login,
 View available canteen food items,
 View food details such as price, category, and description,
@@ -17,6 +19,7 @@ View order status,
 View previous reviews and orders, add polls with other students etc...
 
 Management Features
+
 Management login,
 View all student reviews,
 View sentiment analysis results,
