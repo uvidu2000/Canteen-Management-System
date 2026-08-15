@@ -8,62 +8,73 @@ The system also includes an online ordering feature where students can place foo
 
 Key Features
 Student Features
-Student login
-View available canteen food items
-View food details such as price, category, and description
-Submit food reviews and ratings
-Place food orders online
-View order status
-View previous reviews and orders
+Student login,
+View available canteen food items,
+View food details such as price, category, and description,
+Submit food reviews and ratings,
+Place food orders online,
+View order status,
+View previous reviews and orders, add polls with other students etc...
+
 Management Features
-Management login
-View all student reviews
-View sentiment analysis results
-Monitor positive, negative, and neutral feedback
-View aspect-based sentiment results
-View incoming food orders
-Update order status
+Management login,
+View all student reviews,
+View sentiment analysis results,
+Monitor positive, negative, and neutral feedback,
+View aspect-based sentiment results,
+View incoming food orders,
+Update order status,
 Identify low-rated food items
+
 Sentiment Analysis Features
-Rule-based algorithmic sentiment analysis
-Text preprocessing
-Phrase-level sentiment scoring
-Word-level sentiment scoring
-Negation handling
-Intensity handling
+
+Rule-based algorithmic sentiment analysis,
+Text preprocessing,
+Phrase-level sentiment scoring,
+Word-level sentiment scoring,
+Negation handling,
+Intensity handling,
 Contrast handling
+
 Aspect-based sentiment analysis for:
-Taste
-Portion
-Price
-Service
+
+Taste,
+Portion,
+Price,
+Service,
 Hygiene
+
 Ordering Features
-Add food items to cart
-Place food orders
-Store order details
-Track order status
+
+Add food items to cart,
+Place food orders,
+Store order details,
+Track order status,
 Management order status updates
+
 Technology Stack
+
 Frontend
-React JS
-TypeScript
-Vite
-Tailwind CSS
-shadcn/ui
-React Router
-TanStack Query
-Axios
-React Hook Form
+
+React JS,
+TypeScript,
+Vite,
+Tailwind CSS,
+shadcn/ui,
+React Router,
+TanStack Query,
+Axios,
+React Hook Form,
 Zod
-i18next
+
 Backend
-Python
-Flask
-SQLite
-Flask-CORS
-Werkzeug password hashing
-Database
+
+Python,
+Flask,
+SQLite,
+Flask-CORS,
+Werkzeug password hashing,
+Database,
 SQLite local database
 
 The system uses SQLite because it is lightweight, free, and suitable for running the project locally on a laptop without requiring a separate database server.
